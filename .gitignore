@@ -1,0 +1,28 @@
+# ── Python ──
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# ── IDE ──
+.vscode/
+
+# ── Environment ──
+.env
+
+# ── Database (dev) ──
+*.db
+
+# ── ML models (too large for git — use Git LFS or download script) ──
+models/compressed/*.onnx
+models/compressed/*.joblib
+
+# ── Vector store (rebuild with ingestion script) ──
+data/chroma.sqlite3
+data/14*/
+
+# ── Misc ──
+uv.lock

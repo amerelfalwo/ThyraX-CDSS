@@ -1,0 +1,32 @@
+[project]
+name = "thyroid-cancer"
+version = "2.0.0"
+description = "ThyraX CDSS - Clinical Decision Support System for Thyroid Cancer"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # ── Existing ──
+    "fastapi>=0.115.0",
+    "joblib>=1.4.0",
+    "numpy>=1.26.0",
+    "onnxruntime>=1.17.0",
+    "opencv-python-headless>=4.9.0",
+    "pandas>=2.2.0",
+    "python-multipart>=0.0.9",
+    "scikit-learn>=1.4.0",
+    "uvicorn>=0.27.0",
+    "xgboost>=2.0.0",
+    # ── NEW: LangChain Agent ──
+    "langchain>=0.3.0",
+    "langchain-groq>=0.2.0",
+    "langchain-community>=0.3.0",
+    # ── NEW: RAG & Embeddings ──
+    "chromadb>=0.5.0",
+    "sentence-transformers>=3.0.0",
+    # ── NEW: Database ──
+    "sqlalchemy[asyncio]>=2.0.0",
+    "aiosqlite>=0.20.0",
+    # ── NEW: Settings ──
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+]

@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+numpy
+opencv-python-headless
+joblib
+pandas
+scikit-learn
+onnxruntime
