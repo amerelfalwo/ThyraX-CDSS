@@ -44,9 +44,9 @@ def run_test():
         health = requests.get(BASE_URL, timeout=5)
         health.raise_for_status()
         msg = health.json().get("message", "")
-        print(f"  ✅ Server is running: {msg}")
+        print(f"   Server is running: {msg}")
     except requests.ConnectionError:
-        print(f"  ❌ Cannot connect to server at {BASE_URL}")
+        print(f"   Cannot connect to server at {BASE_URL}")
         print("     Start the server first:")
         print('     cd "/mnt/work/thyroid api/thyroid_canser"')
         print("     uv run python -m uvicorn main:app --port 8000")
