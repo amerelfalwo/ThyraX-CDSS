@@ -9,67 +9,18 @@ POST /assess/clinical
       normal + no nodule  →  routine follow-up
 """
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional
 
-from app.disease.model import predict_thyroid
+import pandas as pd
+from app.core.mlops import load_production_model
 from app.core.database import get_db
-from app.models.patient import Patient, Visit
+from app.core.security import verify_internal_api_key
 
-router = APIRouter(prefix="/assess", tags=["Clinical Assessment"])
+from app.schemas.clinical import ClinicalAssessmentRequest, ClinicalAssessmentResponse
 
-
-# ═══════════════════════════════════════════════════════════════
-# Request / Response Schemas
-# ═══════════════════════════════════════════════════════════════
-
-class ClinicalAssessmentRequest(BaseModel):
-    """Labs + clinical context submitted by the doctor."""
-    # ── Patient info ──
-    patient_id: Optional[int] = Field(None, description="Existing patient ID. If None, a new patient record is created.")
-    patient_name: str = Field(..., min_length=1, description="Patient name")
-    age: int = Field(..., ge=0, le=120)
-    gender: Optional[str] = Field(None, description="M / F / Other")
-
-    # ── Lab results (same features the disease model expects) ──
-    TT4: float = Field(..., ge=0, description="Total T4 (µg/dL)")
-    TSH: float = Field(..., ge=0, description="TSH (µIU/mL)")
-    T3: float = Field(..., ge=0, description="T3 (ng/mL)")
-    FTI: float = Field(..., ge=0, description="Free Thyroxine Index")
-    T4U: float = Field(..., ge=0, description="T4 Uptake")
-
-    # ── Clinical flags ──
-    on_thyroxine: int = Field(0, ge=0, le=1)
-    thyroid_surgery: int = Field(0, ge=0, le=1)
-    query_hyperthyroid: int = Field(0, ge=0, le=1)
-    nodule_present: bool = Field(False, description="Physical examination: is a palpable nodule present?")
-
-    # ── Optional doctor notes ──
-    notes: Optional[str] = None
-
-
-class ClinicalAssessmentResponse(BaseModel):
-    status: str
-    patient_id: int
-    visit_id: int
-
-    # ── Disease model output ──
-    functional_status: str
-    probabilities: dict
-
-    # ── Agentic routing ──
-    risk_level: str
-    clinical_recommendation: str
-    next_step: str
-    next_step_details: dict
-
-    disclaimer: str = (
-        "⚕️ DISCLAIMER: This AI-generated assessment is a clinical decision "
-        "support tool ONLY. The final diagnosis and treatment decisions must "
-        "be made by a qualified physician. This system does NOT replace "
-        "professional medical judgment."
-    )
+router = APIRouter(prefix="/clinical", tags=["Clinical Assessment"], dependencies=[Depends(verify_internal_api_key)])
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -142,10 +93,10 @@ def _route_clinical_decision(functional_status: str, nodule_present: bool, proba
 
 
 # ═══════════════════════════════════════════════════════════════
-# Endpoint
+# Endpoints
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/clinical", response_model=ClinicalAssessmentResponse)
+@router.post("/assess", response_model=ClinicalAssessmentResponse)
 async def assess_clinical(req: ClinicalAssessmentRequest, db: AsyncSession = Depends(get_db)):
     """
     Phase 1: Run disease model  →  Phase 2: Agentic routing.
@@ -153,70 +104,39 @@ async def assess_clinical(req: ClinicalAssessmentRequest, db: AsyncSession = Dep
     """
     # ── 1. Run the disease prediction model ──
     disease_input = {
-        "TT4": req.TT4,
         "TSH": req.TSH,
         "T3": req.T3,
+        "TT4": req.TT4,
         "FTI": req.FTI,
         "T4U": req.T4U,
-        "age": req.age,
-        "on_thyroxine": req.on_thyroxine,
-        "thyroid_surgery": req.thyroid_surgery,
-        "query_hyperthyroid": req.query_hyperthyroid,
+        # Defaulting remaining disease parameters not provided by SaaS simplified endpoint
+        "age": 50,
+        "on_thyroxine": 0,
+        "thyroid_surgery": 0,
+        "query_hyperthyroid": 0,
     }
 
     try:
-        prediction = predict_thyroid(disease_input)
+        model = load_production_model("thyrax_xgboost")
+        LABEL_MAP = {0: 'normal', 1: 'hypothyroid', 2: 'hyperthyroid'}
+        df = pd.DataFrame([disease_input])
+        
+        pred = int(model.predict(df)[0])
+        probs = model.predict_proba(df)[0]
+        prob_dict = {LABEL_MAP[i]: float(probs[i]) for i in range(len(probs))}
+        
+        functional_status = LABEL_MAP[pred]
+        probabilities = prob_dict
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Disease model error: {e}")
-
-    functional_status: str = prediction["label"]
-    probabilities: dict = prediction["probabilities"]
 
     # ── 2. Agentic routing ──
     routing = _route_clinical_decision(functional_status, req.nodule_present, probabilities)
 
-    # ── 3. Persist patient + visit ──
-    try:
-        if req.patient_id:
-            patient = await db.get(Patient, req.patient_id)
-            if not patient:
-                raise HTTPException(status_code=404, detail=f"Patient ID {req.patient_id} not found")
-        else:
-            patient = Patient(name=req.patient_name, age=req.age, gender=req.gender)
-            db.add(patient)
-            await db.flush()  # get the auto-generated ID
-
-        visit = Visit(
-            patient_id=patient.id,
-            tsh=req.TSH,
-            t3=req.T3,
-            t4=req.TT4,    # TT4 stored as t4
-            tt4=req.TT4,
-            fti=req.FTI,
-            t4u=req.T4U,
-            on_thyroxine=bool(req.on_thyroxine),
-            thyroid_surgery=bool(req.thyroid_surgery),
-            query_hyperthyroid=bool(req.query_hyperthyroid),
-            nodule_present=req.nodule_present,
-            functional_status=functional_status,
-            clinical_recommendation=routing["recommendation"],
-            next_step=routing["next_step"],
-            notes=req.notes,
-        )
-        db.add(visit)
-        await db.commit()
-        await db.refresh(visit)
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    # ── 4. Return response ──
+    # ── 3. Return response (DB saving decoupled) ──
     return ClinicalAssessmentResponse(
         status="success",
-        patient_id=patient.id,
-        visit_id=visit.id,
+        patient_id=req.patient_id,
         functional_status=functional_status,
         probabilities=probabilities,
         risk_level=routing["risk_level"],

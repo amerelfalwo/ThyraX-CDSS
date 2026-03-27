@@ -1,6 +1,35 @@
-.venv/
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# DVC and Data
+.dvc/
+.dvc/cache
+data/raw_data/
+data/vector_store/
+models/compressed/
+
+# Local Environment
+.env
+.env.local
+
+# MLflow
+mlruns/
+mlflow.db
+
+# Database
+thyrax.db
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Git
 .git/
-.vscode/
-*.joblib
-*.tflite
+.gitignore

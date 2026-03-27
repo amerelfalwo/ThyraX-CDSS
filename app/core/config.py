@@ -12,9 +12,13 @@ class Settings(BaseSettings):
     APP_VERSION: str = "2.0.0"
 
     # ── LLM ──
-    GROQ_API_KEY: str = ""
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
+    GOOGLE_API_KEY_LABS: str = ""
+    GOOGLE_API_KEY_VISION: str = ""
+    GOOGLE_API_KEY_AGENT: str = ""
     LLM_TEMPERATURE: float = 0.1
+
+    # ── Internal Service Auth ──
+    INTERNAL_SERVICE_KEY: str = ""
 
     # ── Database ──
     DATABASE_URL: str = "sqlite+aiosqlite:///./thyrax.db"

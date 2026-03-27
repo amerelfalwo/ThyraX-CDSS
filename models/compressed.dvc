@@ -1,0 +1,6 @@
+outs:
+- md5: 2be65b0c83652d7880247f44f514dd7b.dir
+  size: 68983716
+  nfiles: 3
+  hash: md5
+  path: compressed

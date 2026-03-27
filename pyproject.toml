@@ -29,4 +29,13 @@ dependencies = [
     # ── NEW: Settings ──
     "pydantic-settings>=2.0.0",
     "python-dotenv>=1.0.0",
+    # ── Frontend ──
+    "streamlit>=1.35.0",
+    # ── NEW: Vision OCR & Validation ──
+    "anthropic>=0.25.0",
+    "langchain-google-genai>=4.2.1",
+    "google-generativeai>=0.8.6",
+    "mlflow>=3.10.1",
+    "dvc>=3.67.0",
+    "evidently>=0.7.21",
 ]

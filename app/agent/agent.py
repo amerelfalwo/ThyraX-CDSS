@@ -4,7 +4,7 @@ LangChain Agent for the ThyraX CDSS.
 Uses a ReAct-style agent with access to medical guidelines RAG,
 patient history SQL queries, and similar case retrieval tools.
 """
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
@@ -28,6 +28,7 @@ You have access to three specialized tools:
 - Always base your answers on EVIDENCE from the tools. Never fabricate medical information.
 - When citing guidelines, reference the specific source document.
 - If asked about a specific patient, ALWAYS use query_patient_history first.
+- **CRITICAL**: When using the query_patient_history tool, you MUST mathematically and clinically compare the patient's current results with their historical records (e.g., note if TSH is trending up/down, or if a nodule is mentioned in past notes). Trend analysis is critical for your CDSS recommendations.
 - When comparing with similar cases, use find_similar_cases with the appropriate parameters.
 - Present information in a structured, clinically relevant format.
 - Clearly distinguish between established guidelines and AI-generated analysis.
@@ -59,9 +60,9 @@ def get_agent_executor() -> AgentExecutor:
         return _agent_executor
 
     # Initialize the LLM
-    llm = ChatGroq(
-        model=settings.LLM_MODEL,
-        api_key=settings.GROQ_API_KEY,
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-pro",
+        api_key=settings.GOOGLE_API_KEY_AGENT,
         temperature=settings.LLM_TEMPERATURE,
         max_tokens=2048,
     )

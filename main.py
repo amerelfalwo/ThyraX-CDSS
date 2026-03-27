@@ -13,9 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.disease.schema import ThyroidInput
 from app.disease.model import predict_thyroid
-from app.segmentation.model import process_full_pipeline
 from app.core.database import init_db
-from app.routers import clinical, chat
+from app.routers import clinical, chat, labs, image, patient
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -66,21 +65,20 @@ app.include_router(clinical.router)
 app.include_router(chat.router)
 
 
+app.include_router(labs.router)
+app.include_router(patient.router)
+app.include_router(image.router)
+
+
 # ═══════════════════════════════════════════════════════════════
-# Original Endpoints (preserved for backwards compatibility)
+# Legacy Disease Model Endpoint
 # ═══════════════════════════════════════════════════════════════
 
-@app.get("/")
+@app.get("/health")
 def health_check():
     return {
-        "status": "success",
-        "message": "ThyraX CDSS API v2.0 is running!",
-        "endpoints": {
-            "disease_prediction": "/predict/disease",
-            "image_pipeline": "/predict/image",
-            "clinical_assessment": "/assess/clinical",
-            "ai_agent": "/agent/chat",
-        },
+        "status": "healthy",
+        "service": "ThyraX AI Engine",
     }
 
 
@@ -92,15 +90,3 @@ def predict_clinical_disease(data: ThyroidInput):
         return {"status": "success", "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
-
-
-@app.post("/predict/image")
-async def predict_ultrasound_image(file: UploadFile = File(...)):
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload an image.")
-    try:
-        image_bytes = await file.read()
-        result = process_full_pipeline(image_bytes)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Image processing error: {str(e)}")

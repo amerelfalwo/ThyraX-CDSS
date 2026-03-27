@@ -1,187 +1,166 @@
-# 🦋 ThyraX CDSS — Clinical Decision Support System for Thyroid Cancer
+# ThyraX CDSS - Clinical Decision Support System
 
-<div align="center">
-  <img src="https://img.shields.io/badge/Python-3.13-blue?logo=python" alt="Python">
-  <img src="https://img.shields.io/badge/FastAPI-0.135+-009688?logo=fastapi" alt="FastAPI">
-  <img src="https://img.shields.io/badge/LangChain-Agent-1C3C3C?logo=langchain" alt="LangChain">
-  <img src="https://img.shields.io/badge/ONNX-Runtime-blue?logo=onnx" alt="ONNX">
-  <img src="https://img.shields.io/badge/ChromaDB-RAG-orange" alt="ChromaDB">
-  <img src="https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker" alt="Docker">
-</div>
+ThyraX is a comprehensive Clinical Decision Support System (CDSS) for Thyroid Cancer diagnosis, engineered for production use. It strictly follows the Human-in-the-Loop principle, integrating a robust FastAPI backend, a modern Streamlit frontend, and a complete MLOps pipeline for model tracking and versioning.
 
-<p align="center">
-  <em>An agentic, multi-phase AI system that assists physicians in diagnosing thyroid cancer — from lab assessment to ultrasound analysis and AI-guided clinical reasoning.</em>
-</p>
+## System Architecture
 
----
+The project is structured into three main components:
 
-## ⚕️ Project Overview
+### 1. Backend Service (FastAPI)
+A modular API architecture divided into highly specialized routers:
+- Labs Router: Premium AI OCR extraction using Gemini Vision to map medical laboratory report images to structured JSON data.
+- Clinical Router: Core assessment engine. Evaluates laboratory features (TSH, T3, TT4, FTI, T4U) through our XGBoost disease model and provides rule-based agentic routing.
+- Image Router: End-to-end ultrasound pipeline featuring an AI gatekeeper for strict image validation and an ONNX-based segmentation/classification pipeline for TI-RADS staging.
+- Patient Router: Handles patient creation and longitudinal tracking of laboratory metrics and clinical history stored in SQLite/PostgreSQL.
+- Chat Router: LangChain ReAct medical agent integrated with RAG (18+ medical guidelines, ACR TI-RADS, PubMed) and SQL patient history.
 
-**ThyraX** is a comprehensive **Clinical Decision Support System (CDSS)** for Thyroid Cancer diagnosis, built as a graduation capstone project. It strictly follows the **"Human-in-the-Loop"** principle — every AI output is clearly a recommendation to assist the physician, never a replacement for clinical judgment.
+### 2. Security Layer
+All AI endpoints are protected behind an Internal API Key authentication system using the `X-AI-Service-Key` header. This ensures only authorized microservices (the main website backend) can access paid AI features. A public `GET /health` endpoint is available for uptime monitoring without authentication.
 
-The system combines:
-- 🔬 An **XGBoost disease model** that interprets lab results (TSH, T3, T4)
-- 🤖 A **medically-driven agentic router** that decides the next clinical step
-- 🖼️ An **ONNX image pipeline** for ultrasound tumor segmentation & TI-RADS classification
-- 🧠 A **LangChain ReAct AI Agent** with RAG over 18 medical PDFs and SQL patient history
+### 3. MLOps Pipeline (MLflow and DVC)
+- DVC manages local raw data sets and handles the versioning of large model binaries.
+- MLflow orchestrates model tracking, metric logging, and model registry. The FastAPI backend dynamically fetches the XGBoost model aliased as "Production" from the local SQLite MLflow registry at runtime.
 
----
+### 4. Frontend Application (Streamlit)
+A professional interface designed for clinical environments featuring 4 dedicated tabs:
+- Dashboard: Visualizes longitudinal patient metrics (such as TSH trends) and complete visit history.
+- Clinical and OCR: Dual-column interface for uploading lab reports with AI auto-fill and manually submitting clinical disease assessments.
+- Ultrasound AI: Image upload UI displaying the gatekeeper validation status alongside the final segmentation AI results.
+- AI Assistant: A persistent chat interface natively prompting the downstream LangChain ReAct agent.
 
-## 🏗️ System Architecture — 4 Phases
+## API Endpoints
 
-```
-Phase 1: Lab Input (TSH, T3, T4) ──→ XGBoost Disease Model
-                                              │
-Phase 2:                         ┌───────────▼────────────┐
-         Agentic Router ─────────┤ hyperthyroid → I-123 scan│
-                                 │ hypo/normal + nodule     │──→ Phase 3
-                                 │   → Upload Ultrasound    │
-                                 │ normal, no nodule        │
-                                 │   → Routine Follow-up    │
-                                 └──────────────────────────┘
+| Method | Endpoint | Auth Required | Description |
+|--------|----------|---------------|-------------|
+| GET | /health | No | Public health check for uptime monitoring |
+| POST | /labs/extract | Yes | Premium Gemini Vision OCR for lab reports |
+| POST | /clinical/assess | Yes | XGBoost disease prediction and agentic routing |
+| POST | /image/validate | Yes | AI gatekeeper for ultrasound image validation |
+| POST | /image/predict | Yes | ONNX segmentation and TI-RADS classification |
+| POST | /patient/create | Yes | Create a new patient profile |
+| POST | /patient/{id}/visit | Yes | Save confirmed visit data |
+| GET | /patient/{id}/dashboard | Yes | Full patient history and longitudinal data |
+| POST | /agent/chat | Yes | LangChain ReAct medical agent with RAG |
 
-Phase 3: Ultrasound Image ──→ ONNX Segmentation ──→ Nodule ROI
-                                                        │
-                                              ONNX Classification
-                                             (Benign / Malignant)
-                                              + TI-RADS Stage (TR1-TR5)
+## Project Structure
 
-Phase 4: Doctor's Question ──→ LangChain ReAct Agent
-                               ├── Tool 1: RAG (ATA guidelines, TI-RADS, PubMed)
-                               ├── Tool 2: SQL Patient History
-                               └── Tool 3: Similar Cases Search
-```
-
----
-
-## 🌐 API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET`  | `/` | Health check |
-| `POST` | `/predict/disease` | Raw XGBoost disease model prediction |
-| `POST` | `/predict/image` | Ultrasound image segmentation + classification |
-| `POST` | `/assess/clinical` | Full CDSS: Phase 1 & 2 (labs → routing) |
-| `POST` | `/agent/chat` | AI medical assistant with RAG + patient history |
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Backend** | FastAPI, Uvicorn, Python 3.13 |
-| **Disease Model** | XGBoost (Joblib compressed) |
-| **Image Pipeline** | ONNX Runtime, OpenCV, NumPy |
-| **AI Agent** | LangChain, Groq (`llama-3.3-70b-versatile`) |
-| **RAG Knowledge Base** | ChromaDB, `all-MiniLM-L6-v2` embeddings |
-| **Patient Database** | SQLAlchemy Async, SQLite / PostgreSQL |
-| **Package Manager** | `uv` (Rust-based, ultra-fast) |
-| **Containerization** | Docker, Docker Compose |
-
----
-
-## 💻 Local Setup
-
-```bash
-git clone https://github.com/your-username/thyrax-cdss.git
-cd thyrax-cdss
-```
-
-### 1. Configure Environment
-Create a `.env` file:
-```env
-GROQ_API_KEY=your_groq_api_key_here
-DATABASE_URL=sqlite+aiosqlite:///./thyrax.db
-```
-
-### 2. Run with `uv` (Development)
-```bash
-uv sync
-uv run python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### 3. Run with Docker (Production)
-```bash
-docker compose up --build
-```
-
-> **Note:** The ONNX models (`models/compressed/`) and ChromaDB vector store (`data/`) are excluded from git due to size. Place them in the correct directories before running.
-
-Swagger UI: **http://localhost:8000/docs**
-
----
-
-## 📁 Project Structure
-
-```
+```text
 thyrax-cdss/
-├── main.py                    # FastAPI entry point
 ├── app/
 │   ├── core/
-│   │   ├── config.py          # Centralized settings (Pydantic)
-│   │   └── database.py        # Async SQLAlchemy engine
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── mlops.py
+│   │   └── security.py
 │   ├── disease/
-│   │   ├── model.py           # XGBoost predict_thyroid()
-│   │   └── schema.py          # ThyroidInput schema
+│   │   └── schema.py
 │   ├── segmentation/
-│   │   └── model.py           # ONNX seg + classification pipeline
-│   ├── models/
-│   │   └── patient.py         # Patient, Visit, ImagingResult ORM
+│   │   └── model.py
+│   ├── schemas/
+│   │   ├── clinical.py
+│   │   ├── patient.py
+│   │   ├── labs.py
+│   │   ├── image.py
+│   │   └── chat.py
 │   ├── agent/
-│   │   ├── agent.py           # LangChain ReAct agent + guardrails
-│   │   └── tools.py           # 3 tools: RAG, SQL, Similar Cases
+│   │   ├── agent.py
+│   │   └── tools.py
 │   └── routers/
-│       ├── clinical.py        # /assess/clinical (Phase 1 & 2)
-│       └── chat.py            # /agent/chat (Phase 4)
-├── models/compressed/         # ONNX + Joblib models (gitignored)
+│       ├── clinical.py
+│       ├── labs.py
+│       ├── image.py
+│       ├── patient.py
+│       └── chat.py
+├── frontend/
+│   └── app.py
+├── models/
+│   └── compressed/
 ├── data/
-│   ├── documents/             # 18 medical PDFs for RAG
-│   │   ├── Primary Guidelines/    # ATA 2025 & 2015 guidelines
-│   │   ├── Radiology & TI-RADS/   # ACR TI-RADS papers
-│   │   ├── PubMed Central/        # Research papers
-│   │   └── AI & Intelligent Diagnosis/
-│   └── (vector_store/)        # ChromaDB index (gitignored)
-├── test_agent.py              # Agent integration test script
-├── pyproject.toml
-└── dockerfile / docker-compose.yml
+│   └── raw_data/
+├── scripts/
+│   └── register_mlflow.py
+├── train_model.py
+├── main.py
+└── pyproject.toml
 ```
 
----
+## Setup and Execution Guide
 
-## 🧪 Testing the Agent
+### Environment Configuration
+
+Create a `.env` file in the root directory:
+
+```env
+GOOGLE_API_KEY_LABS=your_google_ai_key
+GOOGLE_API_KEY_VISION=your_google_ai_key
+GOOGLE_API_KEY_AGENT=your_google_ai_key
+DATABASE_URL=sqlite+aiosqlite:///./thyrax.db
+INTERNAL_SERVICE_KEY=your_secret_service_key
+```
+
+### Dependency Installation
 
 ```bash
-# Make sure the server is running, then:
-uv run python test_agent.py
+uv sync
 ```
 
-Expected output:
-```
-✅ Server is running: ThyraX CDSS API v2.0
+### MLOps Initialization
 
-🔧 Tools Invoked: search_medical_guidelines, query_patient_history
-
-🩺 Agent Response:
-  According to the ATA guidelines, the recommended management plan
-  for a hypothyroid patient with a palpable nodule includes
-  fine-needle aspiration (FNA)...
-
-Status: SUCCESS | HTTP: 200
+```bash
+uv run dvc init
+uv run dvc add models/compressed/ data/raw_data/
+uv run python train_model.py
+uv run python scripts/register_mlflow.py
 ```
 
----
+### Running the System
 
-## 🔒 Clinical Guardrails
+You will need three separate terminal sessions to launch the entire architecture:
 
-Every AI response includes a mandatory CDSS disclaimer:
+Terminal 1 - MLflow Tracking UI
+```bash
+uv run mlflow ui --backend-store-uri sqlite:///./mlflow.db --port 5000
+```
 
-> ⚕️ *This AI-generated analysis is provided as a clinical decision support tool only. It does not constitute medical advice or a definitive diagnosis. All clinical decisions must be made by a qualified healthcare professional.*
+Terminal 2 - FastAPI Backend
+```bash
+uv run python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
----
+Terminal 3 - Streamlit Frontend
+```bash
+uv run streamlit run frontend/app.py
+```
 
-## 👥 Contributors
+Once all services are running:
+- ThyraX CDSS Frontend: http://localhost:8501
+- FastAPI Swagger Docs: http://localhost:8000/docs
+- MLflow Tracking UI: http://localhost:5000
 
-- **[Your Name]** — AI / Backend Engineer
+### Authenticating API Requests
 
-*Designed and developed as a Graduation Capstone Project.*
+All protected endpoints require the `X-AI-Service-Key` header. Example:
+
+```bash
+curl -X POST http://localhost:8000/clinical/assess \
+     -H "X-AI-Service-Key: your_secret_service_key" \
+     -H "Content-Type: application/json" \
+     -d '{"patient_id": 1, "TSH": 2.5, "T3": 1.2, "TT4": 8.0, "FTI": 5.5, "T4U": 1.1, "nodule_present": true}'
+```
+
+Requests without a valid key will receive a `403 Forbidden` response. The `/health` endpoint does not require authentication.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Backend | FastAPI, Uvicorn, Python 3.13 |
+| Disease Model | XGBoost (MLflow Registry) |
+| Image Pipeline | ONNX Runtime, OpenCV |
+| AI Agent | LangChain, Google Gemini 2.5 Pro |
+| Vision OCR | Google Gemini 2.5 Flash |
+| RAG Knowledge Base | ChromaDB, all-MiniLM-L6-v2 |
+| Patient Database | SQLAlchemy Async, SQLite |
+| MLOps | MLflow, DVC, Evidently |
+| Frontend | Streamlit |
+| Package Manager | uv |

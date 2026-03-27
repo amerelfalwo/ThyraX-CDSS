@@ -6,35 +6,14 @@ POST /agent/chat
   - Invokes the LangChain agent with RAG, SQL, and similar case tools
   - Returns AI response with CDSS disclaimer
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, List
 
 from app.agent.agent import run_agent
+from app.core.security import verify_internal_api_key
+from app.schemas.chat import ChatRequest, ChatResponse
 
-router = APIRouter(prefix="/agent", tags=["AI Agent"])
-
-
-# ═══════════════════════════════════════════════════════════════
-# Schemas
-# ═══════════════════════════════════════════════════════════════
-
-class ChatRequest(BaseModel):
-    query: str = Field(..., min_length=1, description="Medical question for the AI assistant")
-    patient_id: Optional[int] = Field(None, description="Optional patient ID for history-aware queries")
-
-
-class ChatResponse(BaseModel):
-    status: str
-    query: str
-    response: str
-    tools_used: List[str]
-    disclaimer: str = (
-        "⚕️ CDSS Disclaimer: This AI-generated analysis is provided as a "
-        "clinical decision support tool only. It does not constitute medical "
-        "advice or a definitive diagnosis. All clinical decisions must be made "
-        "by a qualified healthcare professional."
-    )
+router = APIRouter(prefix="/agent", tags=["AI Agent"], dependencies=[Depends(verify_internal_api_key)])
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -1,0 +1,22 @@
+artifact_path: /mnt/work/ThyraX-CDSS/mlruns/2/models/m-d81e247ae121426a85ad93f474d791fe/artifacts
+flavors:
+  python_function:
+    data: model.ubj
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.13.12
+  xgboost:
+    code: null
+    data: model.ubj
+    model_class: xgboost.sklearn.XGBClassifier
+    model_format: ubj
+    xgb_version: 3.2.0
+mlflow_version: 3.10.1
+model_id: m-d81e247ae121426a85ad93f474d791fe
+model_size_bytes: 276531
+model_uuid: m-d81e247ae121426a85ad93f474d791fe
+prompts: null
+run_id: 3c297c617f9f4092a822bc0d5883f6fc
+utc_time_created: '2026-03-27 20:22:25.745834'
