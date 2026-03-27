@@ -164,3 +164,88 @@ Requests without a valid key will receive a `403 Forbidden` response. The `/heal
 | MLOps | MLflow, DVC, Evidently |
 | Frontend | Streamlit |
 | Package Manager | uv |
+
+## Docker Deployment
+
+The entire system is containerized using a single `Dockerfile` and orchestrated via `docker-compose.yml` into three dedicated services.
+
+### Services
+
+| Container | Port | Role |
+|-----------|------|------|
+| `thyrax_api` | 8000 | FastAPI backend serving all AI endpoints |
+| `thyrax_frontend` | 8501 | Streamlit clinical UI |
+| `thyrax_mlflow` | 5000 | MLflow model tracking and registry |
+
+### Persistent Volumes
+
+The following directories are mounted as volumes so that data survives container restarts:
+
+| Volume | Purpose |
+|--------|---------|
+| `./thyrax.db` | SQLite patient database |
+| `./mlflow.db` + `./mlruns` | MLflow experiment and model tracking state |
+| `./data/vector_store` | ChromaDB vector embeddings (RAG knowledge base) |
+| `./models/compressed` | ONNX and XGBoost model binaries (not baked into the image) |
+
+### Build and Launch
+
+```bash
+docker compose up --build -d
+```
+
+To stop all services:
+
+```bash
+docker compose down
+```
+
+To view service logs:
+
+```bash
+docker compose logs -f api
+docker compose logs -f frontend
+```
+
+## Azure VM Deployment
+
+A fully automated setup script is included for provisioning a fresh Ubuntu VM on Microsoft Azure.
+
+### One-Step Provisioning
+
+On the fresh VM, run:
+
+```bash
+bash scripts/setup_azure_vm.sh
+```
+
+This script automatically:
+1. Updates and upgrades Ubuntu apt packages
+2. Installs Docker Engine, CLI, containerd, and the Compose plugin from the Official Docker apt repository (not snap)
+3. Adds the current user to the docker group (no sudo required)
+4. Creates a `.env` template with all required keys
+5. Prints color-coded next steps and service URLs
+
+### After Running the Script
+
+```bash
+# Step 1 - Activate docker group without logging out
+newgrp docker
+
+# Step 2 - Insert your API keys
+nano .env
+
+# Step 3 - Launch the full cluster
+docker compose up --build -d
+```
+
+### Azure NSG Inbound Rules
+
+Open the following ports in the VM's Network Security Group on the Azure portal:
+
+| Port | Service |
+|------|---------|
+| 8000 | FastAPI Backend |
+| 8501 | Streamlit Frontend |
+| 5000 | MLflow Tracking UI |
+
