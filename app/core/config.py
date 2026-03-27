@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     CHROMA_SIMILAR_CASES_COLLECTION: str = "similar_cases"
 
     # ── Embeddings ──
-    EMBEDDING_MODEL: str = "BAAI/bge-base-en-v1.5"
+    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

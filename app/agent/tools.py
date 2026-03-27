@@ -9,12 +9,16 @@ import os
 import numpy as np
 from typing import Optional
 from langchain_core.tools import tool
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, create_engine
+from sqlalchemy.orm import sessionmaker, Session
 
 from app.core.config import settings
-from app.core.database import async_session
 from app.models.patient import Patient, Visit, ImagingResult
+
+# Sync engine for use inside LangChain tools (avoids greenlet/asyncio conflicts)
+_sync_db_url = settings.DATABASE_URL.replace("sqlite+aiosqlite", "sqlite")
+_sync_engine = create_engine(_sync_db_url, connect_args={"check_same_thread": False})
+SyncSession = sessionmaker(bind=_sync_engine, expire_on_commit=False)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -102,7 +106,7 @@ def search_medical_guidelines(query: str) -> str:
 # ═══════════════════════════════════════════════════════════════
 
 @tool
-async def query_patient_history(patient_id: int) -> str:
+def query_patient_history(patient_id: int) -> str:
     """
     Retrieve the complete clinical history for a specific patient,
     including all previous visits, lab results, functional status,
@@ -116,25 +120,21 @@ async def query_patient_history(patient_id: int) -> str:
         A formatted summary of the patient's visit history.
     """
     try:
-        async with async_session() as db:
-            # Fetch patient
-            patient = await db.get(Patient, patient_id)
+        with SyncSession() as db:
+            patient = db.get(Patient, patient_id)
             if not patient:
                 return f"No patient found with ID {patient_id}."
 
-            # Fetch visits with imaging results
             stmt = (
                 select(Visit)
                 .where(Visit.patient_id == patient_id)
                 .order_by(Visit.visit_date.desc())
             )
-            result = await db.execute(stmt)
-            visits = result.scalars().all()
+            visits = db.execute(stmt).scalars().all()
 
             if not visits:
                 return f"Patient '{patient.name}' (ID: {patient_id}) has no recorded visits."
 
-            # Format output
             lines = [
                 f"═══ Patient History: {patient.name} ═══",
                 f"Age: {patient.age} | Gender: {patient.gender or 'N/A'}",
@@ -149,18 +149,14 @@ async def query_patient_history(patient_id: int) -> str:
                 lines.append(f"  Nodule: {'Yes' if v.nodule_present else 'No'}")
                 lines.append(f"  Recommendation: {v.clinical_recommendation or 'N/A'}")
                 lines.append(f"  Next Step: {v.next_step or 'N/A'}")
-
-                # Check for imaging results
                 if v.imaging_result:
                     ir = v.imaging_result
                     lines.append(f"  Imaging: {ir.classification_label} | Confidence: {ir.confidence}% | TI-RADS: {ir.tirads_stage}")
-                
                 if v.notes:
                     lines.append(f"  Doctor Notes: {v.notes}")
                 lines.append("")
 
             return "\n".join(lines)
-
     except Exception as e:
         return f"Error querying patient history: {str(e)}"
 
