@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
 import base64
 import json
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -6,7 +6,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
 from app.core.security import verify_internal_api_key
-from app.schemas.image import ImageValidationResponse
+from app.schemas.image import ImageValidationResponse, ImagePredictionResponse
 from app.segmentation.model import process_full_pipeline
 
 router = APIRouter(prefix="/image", tags=["Image Pipeline"], dependencies=[Depends(verify_internal_api_key)])
@@ -60,14 +60,15 @@ async def validate_ultrasound_image(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Image validation error: {str(e)}")
 
 
-@router.post("/predict")
-async def predict_ultrasound_image(file: UploadFile = File(...)):
+@router.post("/predict", response_model=ImagePredictionResponse)
+async def predict_ultrasound_image(request: Request, file: UploadFile = File(...)):
     """Runs the ONNX segmentation/classification models."""
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload an image.")
     try:
         image_bytes = await file.read()
-        result = process_full_pipeline(image_bytes)
+        base_url = str(request.base_url)
+        result = process_full_pipeline(image_bytes, base_url=base_url)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Image processing error: {str(e)}")

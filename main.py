@@ -8,11 +8,10 @@ Combines:
   - LangChain AI Agent with RAG + SQL tools (Phase 4)
 """
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from app.disease.schema import ThyroidInput
-from app.disease.model import predict_thyroid
 from app.core.database import init_db
 from app.routers import clinical, chat, labs, image, patient
 
@@ -39,9 +38,8 @@ app = FastAPI(
     description=(
         "Comprehensive Clinical Decision Support System for Thyroid Cancer Diagnosis.\n\n"
         "## Endpoints\n"
-        "- **`/predict/disease`** — Raw disease model prediction\n"
-        "- **`/predict/image`** — Ultrasound segmentation + classification\n"
-        "- **`/assess/clinical`** — Full CDSS workflow (Phase 1 & 2)\n"
+        "- **`/assess/clinical`** — Full CDSS workflow with disease model + agentic routing\n"
+        "- **`/image/predict`** — Ultrasound segmentation + classification\n"
         "- **`/agent/chat`** — AI medical assistant with RAG tools (Phase 4)\n"
     ),
     version="2.0.0",
@@ -55,6 +53,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount media directory for static file serving
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -71,7 +72,7 @@ app.include_router(image.router)
 
 
 # ═══════════════════════════════════════════════════════════════
-# Legacy Disease Model Endpoint
+# Health Check
 # ═══════════════════════════════════════════════════════════════
 
 @app.get("/health")
@@ -80,13 +81,3 @@ def health_check():
         "status": "healthy",
         "service": "ThyraX AI Engine",
     }
-
-
-@app.post("/predict/disease")
-def predict_clinical_disease(data: ThyroidInput):
-    try:
-        input_data = data.model_dump()
-        result = predict_thyroid(input_data)
-        return {"status": "success", "data": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")

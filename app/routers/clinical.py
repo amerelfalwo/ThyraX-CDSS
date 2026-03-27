@@ -104,16 +104,15 @@ async def assess_clinical(req: ClinicalAssessmentRequest, db: AsyncSession = Dep
     """
     # ── 1. Run the disease prediction model ──
     disease_input = {
+        "age": req.age,
+        "on_thyroxine": req.on_thyroxine,
+        "thyroid_surgery": req.thyroid_surgery,
+        "query_hyperthyroid": req.query_hyperthyroid,
         "TSH": req.TSH,
         "T3": req.T3,
         "TT4": req.TT4,
         "FTI": req.FTI,
         "T4U": req.T4U,
-        # Defaulting remaining disease parameters not provided by SaaS simplified endpoint
-        "age": 50,
-        "on_thyroxine": 0,
-        "thyroid_surgery": 0,
-        "query_hyperthyroid": 0,
     }
 
     try:
