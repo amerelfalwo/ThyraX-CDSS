@@ -147,12 +147,81 @@ Service URLs:
 - Frontend: http://localhost:8501
 - MLflow: http://localhost:5000
 
+## Project Scripts (Missing Part)
+
+The repository includes helper scripts that are important for full workflow but were easy to miss:
+
+1. Model training script
+
+```bash
+uv run python train_model.py
+```
+
+- trains an XGBoost multi-class model
+- logs params/metrics to MLflow
+- registers model as ThyraX_Disease_Classifier
+
+2. Register existing production model
+
+```bash
+uv run python scripts/register_mlflow.py
+```
+
+- loads local model file from models/compressed/disease_compressed.joblib
+- registers it in MLflow as thyrax_xgboost
+- sets MLflow alias Production to latest version
+
+3. Agent endpoint test script
+
+```bash
+uv run python test_agent.py
+```
+
+- sends a realistic /agent/chat request
+- verifies tools invocation and response path
+- useful for quick smoke test after deployment
+
+## Agent and RAG Notes
+
+The assistant depends on ChromaDB collections configured in app settings:
+
+- CHROMA_GUIDELINES_COLLECTION=pdf_documents
+- CHROMA_SIMILAR_CASES_COLLECTION=similar_cases
+
+If these collections are not populated yet, agent responses will still run but retrieval quality will be limited.
+
+Recommended minimum for agent readiness:
+
+1. Ensure .env has valid GOOGLE_API_KEY_AGENT and INTERNAL_SERVICE_KEY.
+2. Ensure database is initialized by running the API once.
+3. Ensure vector data exists under data/vector_store.
+4. Run test_agent.py to verify end-to-end behavior.
+
 ## Docker Setup
 
 Build and run:
 
 ```bash
 docker compose up --build -d
+```
+
+What this starts:
+
+- api service on port 8000 (FastAPI)
+- frontend service on port 8501 (Streamlit)
+- mlflow service on port 5000 (MLflow UI)
+
+Useful lifecycle commands:
+
+```bash
+# Start existing containers
+docker compose up -d
+
+# Rebuild a single service
+docker compose up -d --build api
+
+# Check container status
+docker compose ps
 ```
 
 Stop services:
@@ -174,6 +243,49 @@ Default container ports:
 - 8000: thyrax_api
 - 8501: thyrax_frontend
 - 5000: thyrax_mlflow
+
+Persistent mounted paths:
+
+- ./thyrax.db -> /app/thyrax.db
+- ./data/vector_store -> /app/data/vector_store
+- ./models/compressed -> /app/models/compressed
+- ./mlflow.db -> /app/mlflow.db
+- ./mlruns -> /app/mlruns
+
+## Cloud Deployment Script (Azure VM)
+
+If you already prepared the cloud bootstrap script, use:
+
+```bash
+bash scripts/setup_azure_vm.sh
+```
+
+The script will:
+
+- update the VM packages
+- install Docker Engine and Docker Compose plugin
+- add your user to the docker group
+- create a .env template if it does not exist
+- print run commands and public URLs
+
+After running the script:
+
+```bash
+# 1) Activate docker group in current session
+newgrp docker
+
+# 2) Fill your secrets
+nano .env
+
+# 3) Start services
+docker compose up --build -d
+```
+
+Open these inbound ports on your cloud firewall/NSG:
+
+- 8000 for FastAPI
+- 8501 for Streamlit
+- 5000 for MLflow
 
 ## Example Authenticated Request
 
